@@ -4,7 +4,6 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
 from typing import TypedDict, List, Union, Literal
-from langchain_core.tools import tool
 from langchain_tavily import TavilySearch
 from datetime import datetime
 from dotenv import load_dotenv

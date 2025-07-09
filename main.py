@@ -1,6 +1,5 @@
 from Agent import agent
-from langchain_core.messages import HumanMessage, AIMessage
-from pydantic import BaseModel
+from langchain_core.messages import HumanMessage
 import json
 
 def create_file(name:str, content:dict)->None:
@@ -26,7 +25,8 @@ def main():
             content = content[7:-3]
         elif content.startswith('```'):
             content = content[3:-3]
-        else:
+        elif not content.startswith('{') and not content.endswith('}') or not content.startswith('[') and not content.endswith(']'):
+            print("Content is not in JSON format.")
             continue
 
         if not content:
