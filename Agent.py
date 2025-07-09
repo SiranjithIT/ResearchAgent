@@ -26,8 +26,17 @@ class AgentState(TypedDict):
 def call_model(state: AgentState) -> AgentState:
     """Call the model with tools bound."""
     messages = state["messages"]
+    system_msg = SystemMessage(content="""
+                               Your are an helpful research agent capable of providing valuable research data using the tools provided. Give the following contents in JSON format.
+                               1) Title of the research paper.
+                               2) Summary of the research paper.
+                               3) Reference of the research paper.
+                               4) Citation of the research paper.
+                               5) URL of the Research paper.
+                               Give all the relevant papers for the given query. Try to use as many tools as possible that are relevant for the given query.
+                               """)
     
-    processed_messages = []
+    processed_messages = [system_msg]
     for msg in messages:
         if isinstance(msg, ToolMessage):
             processed_messages.append(HumanMessage(content=f"Interpret this Tool result in proper format to the user: {msg.content}"))
@@ -70,5 +79,4 @@ workflow.add_conditional_edges(
     },
 )
 workflow.add_edge("tools", "agent")
-
 agent = workflow.compile(checkpointer=memory)
