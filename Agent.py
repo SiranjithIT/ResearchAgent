@@ -32,7 +32,7 @@ def call_model(state: AgentState) -> AgentState:
                                3) Reference of the research paper.
                                4) Citation of the research paper.
                                5) URL of the Research paper.
-                               Give all the relevant papers for the given query. Try to use as many tools as possible that are relevant for the given query.
+                               Give all the relevant papers for the given query. Try to use as many tools as possible that are relevant for the given query domain. If Agriculture domain query is given, give content only relevant to it. Try to give 5 to 10 papers. Give only json formatted answers, do not give any other formats like list, tuple.
                                """)
     
     processed_messages = [system_msg]

@@ -2,8 +2,10 @@ from langchain_core.tools import tool
 import feedparser
 import requests
 import json
+import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote_plus
+from typing import List, Dict, Any, Optional
 
 
 @tool
@@ -189,47 +191,115 @@ def search_pubmed(query: str, max_results: int = 10) -> str:
 
 @tool
 def search_semantic_scholar(query: str, max_results: int = 10) -> str:
-    """Search Semantic Scholar for research papers across multiple disciplines. Returns paper details with citation counts."""
+    """
+    Search Semantic Scholar for research papers across multiple disciplines.
+    
+    Args:
+        query: Search query string
+        max_results: Maximum number of results to return (default: 10, max: 100)
+    
+    Returns:
+        JSON string with paper details including citation counts
+    """
     try:
+        # Validate inputs
+        if not query or not query.strip():
+            return json.dumps({"error": "Query cannot be empty"})
+        
+        # Limit max_results to reasonable bounds
+        max_results = min(max(1, max_results), 100)
+        
         base_url = "https://api.semanticscholar.org/graph/v1/paper/search"
         
-        params = {
-            "query": query,
-            "limit": max_results,
-            "fields": "title,authors,abstract,year,citationCount,url,venue,externalIds"
+        # Headers for better API compliance
+        headers = {
+            'User-Agent': 'Academic-Research-Tool/1.0'
         }
         
-        response = requests.get(base_url, params=params)
-        data = response.json()
+        params = {
+            "query": query.strip(),
+            "limit": max_results,
+            "fields": "title,authors,abstract,year,citationCount,url,venue,externalIds,publicationDate,journal"
+        }
         
-        if 'data' not in data:
-            return "No results found in Semantic Scholar"
+        # Make request with timeout
+        response = requests.get(base_url, params=params, headers=headers, timeout=30)
         
+        # Check for HTTP errors
+        if response.status_code == 429:
+            return json.dumps({"error": "Rate limit exceeded. Please wait before making another request."})
+        elif response.status_code != 200:
+            return json.dumps({"error": f"HTTP {response.status_code}: {response.text}"})
+        
+        # Parse JSON response
+        try:
+            data = response.json()
+        except json.JSONDecodeError:
+            return json.dumps({"error": "Invalid JSON response from API"})
+        
+        # Check if results exist
+        if 'data' not in data or not data['data']:
+            return json.dumps({
+                "message": "No results found in Semantic Scholar",
+                "query": query,
+                "results": []
+            })
+        
+        # Process results
         results = []
         for paper in data['data']:
-            # Extract author names
-            authors = [author['name'] for author in paper.get('authors', [])]
-            
-            # Get DOI or other external IDs
-            external_ids = paper.get('externalIds', {})
-            doi = external_ids.get('DOI', '')
-            
-            paper_info = {
-                "title": paper.get('title', 'No title'),
-                "authors": authors,
-                "abstract": paper.get('abstract', 'No abstract available'),
-                "year": paper.get('year', ''),
-                "citation_count": paper.get('citationCount', 0),
-                "venue": paper.get('venue', ''),
-                "url": paper.get('url', ''),
-                "doi": doi
-            }
-            results.append(paper_info)
+            try:
+                # Extract author names safely
+                authors = []
+                if paper.get('authors'):
+                    authors = [author.get('name', 'Unknown') for author in paper['authors']]
+                
+                # Get external IDs
+                external_ids = paper.get('externalIds', {}) or {}
+                doi = external_ids.get('DOI', '')
+                arxiv_id = external_ids.get('ArXiv', '')
+                
+                # Clean and format abstract
+                abstract = paper.get('abstract', '')
+                if abstract and len(abstract) > 500:
+                    abstract = abstract[:497] + "..."
+                
+                # Format venue/journal information
+                venue = paper.get('venue', '') or paper.get('journal', {}).get('name', '') if paper.get('journal') else ''
+                
+                paper_info = {
+                    "title": paper.get('title', 'No title available'),
+                    "authors": authors,
+                    "abstract": abstract or 'No abstract available',
+                    "year": paper.get('year') or '',
+                    "publication_date": paper.get('publicationDate', ''),
+                    "citation_count": paper.get('citationCount', 0),
+                    "venue": venue,
+                    "url": paper.get('url', ''),
+                    "doi": doi,
+                    "arxiv_id": arxiv_id
+                }
+                results.append(paper_info)
+                
+            except Exception as paper_error:
+                # Skip problematic papers but continue processing
+                continue
         
-        return json.dumps(results, indent=2)
+        # Return formatted results
+        return json.dumps({
+            "query": query,
+            "total_results": len(results),
+            "results": results
+        }, indent=2, ensure_ascii=False)
     
+    except requests.exceptions.Timeout:
+        return json.dumps({"error": "Request timeout. Please try again."})
+    except requests.exceptions.ConnectionError:
+        return json.dumps({"error": "Connection error. Please check your internet connection."})
+    except requests.exceptions.RequestException as e:
+        return json.dumps({"error": f"Request error: {str(e)}"})
     except Exception as e:
-        return f"Error searching Semantic Scholar: {str(e)}"
+        return json.dumps({"error": f"Unexpected error: {str(e)}"})
 
 
 @tool

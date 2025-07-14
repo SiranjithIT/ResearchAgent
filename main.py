@@ -21,6 +21,8 @@ def main():
         
         print(f"AI: {result['messages'][-1].content}")
         content = result['messages'][-1].content
+        if not isinstance(content, str):
+            content = str(content)
         if content.startswith('```json'):
             content = content[7:-3]
         elif content.startswith('```'):
